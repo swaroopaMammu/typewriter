@@ -311,3 +311,11 @@ input::placeholder { color: var(--muted); }
 .guide .keys { width: 100%; margin-top: 8px; }
 @media (max-width: 900px) { .guide { width: 100%; position: static; max-height: none; } }
 @media (max-width: 640px) { .guide { display: none; } }
+
+/* voice typing */
+.btn.mic.on { background: #d93025; border-color: #d93025; color: #fff; }
+.voice-cap { position: fixed; top: 88px; left: 50%; transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: 10px;
+  max-width: min(640px, calc(100vw - 24px)); padding: 10px 14px; border-radius: 999px; font-size: 15px; }
+.voice-cap .ml { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rec-dot { width: 10px; height: 10px; flex: none; border-radius: 50%; background: #d93025; animation: rec-pulse 1.1s ease-in-out infinite; }
+@keyframes rec-pulse { 50% { opacity: .25; transform: scale(.8); } }

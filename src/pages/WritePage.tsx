@@ -12,6 +12,7 @@ import ComposerBar from "../components/ComposerBar";
 import ScriptEditor from "../components/ScriptEditor";
 import CharactersModal from "../components/CharactersModal";
 import { Confirm, Menu, ThemeToggle } from "../components/ui";
+import VoiceButton from "../components/VoiceButton";
 import { IS_ARTIFACT, IS_NATIVE, IS_TOUCH } from "../env";
 
 const KEYS: [string, string][] = [
@@ -182,6 +183,7 @@ export default function WritePage() {
         <button className="btn mode" onClick={() => setMode(mode === "ml" ? "en" : "ml")} title="Ctrl+M">
           {mode === "ml" ? "മലയാളം" : "English"}
         </button>
+        <VoiceButton mode={mode} />
         {!IS_ARTIFACT && (
           <button className="btn hide-sm" onClick={toggleOnline} title="Use Google Input Tools for better suggestions (sends typed words to Google)">
             Online: {online ? "On" : "Off"}
