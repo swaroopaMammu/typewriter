@@ -319,3 +319,7 @@ input::placeholder { color: var(--muted); }
 .voice-cap .ml { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rec-dot { width: 10px; height: 10px; flex: none; border-radius: 50%; background: #d93025; animation: rec-pulse 1.1s ease-in-out infinite; }
 @keyframes rec-pulse { 50% { opacity: .25; transform: scale(.8); } }
+
+/* phone: the field itself is tappable (cursor + selection handles) even though the typing bar does the typing */
+.touch textarea, .touch input { caret-color: var(--text); }
+.touch textarea.ml-active, .touch input.ml-active { -webkit-user-select: text; user-select: text; }

@@ -27,6 +27,17 @@ export default function MlField(p: Props) {
     // eslint-disable-next-line
   }, []);
 
+  // Phone: the field is tappable (cursor, selection handles) but only the typing bar may change it. React's onBeforeInput
+  // is not the native event and can't cancel it, so listen natively.
+  useEffect(() => {
+    if (p.native || !IS_TOUCH) return;
+    const el = ref.current;
+    if (!el) return;
+    const stop = (e: Event) => e.preventDefault();
+    el.addEventListener("beforeinput", stop);
+    return () => el.removeEventListener("beforeinput", stop);
+  }, [p.native]);
+
   if (p.native) {
     const common = {
       className: p.className, defaultValue: p.initial, placeholder: p.placeholder, lang: "ml", spellCheck: false,
@@ -41,7 +52,12 @@ export default function MlField(p: Props) {
     const activate = () => { if (ref.current) setTarget({ el: ref.current, onChange: p.onChange }); };
     const common = {
       className: p.className, defaultValue: p.initial, placeholder: p.placeholder, lang: "ml",
-      readOnly: true, inputMode: "none" as const, onClick: activate, onFocus: activate,
+      // Not readOnly: a read-only field shows no cursor and can't be tapped to place one. inputMode "none" keeps the
+      // system keyboard away (the typing bar writes here), and native input/paste/cut/drop are blocked so only the bar edits.
+      inputMode: "none" as const, onClick: activate, onFocus: activate,
+      onPaste: (e: React.ClipboardEvent) => e.preventDefault(),
+      onCut: (e: React.ClipboardEvent) => e.preventDefault(),
+      onDrop: (e: React.DragEvent) => e.preventDefault(),
     };
     return p.multiline
       ? <textarea ref={ref as React.RefObject<HTMLTextAreaElement>} rows={2} {...common} />

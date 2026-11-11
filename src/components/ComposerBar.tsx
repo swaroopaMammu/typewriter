@@ -51,25 +51,32 @@ export default function ComposerBar({ mode, online, onToggleMode }: Props) {
     updateWord("");
   }
 
+  /** Insert at the cursor, replacing any selected text. */
   function insert(text: string) {
     const t = getTarget();
     if (!t) return;
     const el = t.el;
-    const pos = Math.min(el.selectionStart ?? el.value.length, el.value.length);
-    el.value = el.value.slice(0, pos) + text + el.value.slice(pos);
-    const np = pos + text.length;
+    const len = el.value.length;
+    const start = Math.min(el.selectionStart ?? len, len);
+    const end = Math.min(el.selectionEnd ?? start, len);
+    el.value = el.value.slice(0, start) + text + el.value.slice(end);
+    const np = start + text.length;
     el.setSelectionRange(np, np);
     t.onChange(el.value);
   }
 
+  /** Delete the selection, or the character before the cursor (wherever the cursor was tapped). */
   function backspace() {
     const t = getTarget();
     if (!t) return;
     const el = t.el;
-    const pos = Math.min(el.selectionStart ?? el.value.length, el.value.length);
-    if (pos <= 0) return;
-    el.value = el.value.slice(0, pos - 1) + el.value.slice(pos);
-    el.setSelectionRange(pos - 1, pos - 1);
+    const len = el.value.length;
+    const start = Math.min(el.selectionStart ?? len, len);
+    const end = Math.min(el.selectionEnd ?? start, len);
+    const from = start === end ? start - 1 : start;
+    if (from < 0 || (start === end && start === 0)) return;
+    el.value = el.value.slice(0, from) + el.value.slice(end);
+    el.setSelectionRange(from, from);
     t.onChange(el.value);
   }
 

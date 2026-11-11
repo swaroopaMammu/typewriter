@@ -45,7 +45,7 @@ export function insertDictation(spoken: string): boolean {
   const r = spliceDictation(el.value, start, end, spoken);
   if (!r) return true;
   el.focus();
-  if (el.readOnly) {
+  if (el.readOnly || f.onChange) { // phone fields only change through their own onChange (native input is blocked)
     el.value = r.value;
     f.onChange?.(r.value);
   } else {
