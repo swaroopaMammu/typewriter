@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
-  addCharacter, addSection, countWords, db, deleteSection, getNovelSections, moveSection, novelType, renameSection, saveContent,
+  addCharacter, addSection, countWords, db, deleteSection, getNovelSections, moveSection, novelType, renameSection, typeLabel, saveContent,
   sceneHeading, sectionLabel, SETTINGS, TIMES, unitName, updateScene,
 } from "../lib/db/db";
 import { downloadNovelBackup, downloadNovelText, downloadSectionText } from "../lib/export/exporters";
@@ -71,7 +71,7 @@ export default function WritePage() {
   const [liveWords, setLiveWords] = useState(0);
   const [help, setHelp] = useState(false);
   const [online, setOnline] = useState(() => {
-    try { return localStorage.getItem("tw-online") !== "0"; } catch { return true; }
+    try { return localStorage.getItem("tw-online") === "1"; } catch { return false; }
   });
   const toggleOnline = () => setOnline((o) => {
     try { localStorage.setItem("tw-online", o ? "0" : "1"); } catch { /* ignore */ }
@@ -165,7 +165,7 @@ export default function WritePage() {
         <button className="btn ghost" onClick={async () => { await flush(); nav("/"); }}>← Novels</button>
         <div className="title">
           <strong className="ml">{novel.name}</strong>
-          <span className="chip">{isScript ? "Screenplay" : "Novel"} · {novel.category}</span>
+          <span className="chip">{typeLabel(type)} · {novel.category}</span>
         </div>
         <div className="spacer" />
         <button className="btn only-mobile" onClick={() => setDrawer((d) => !d)}>☰ {unit}s</button>

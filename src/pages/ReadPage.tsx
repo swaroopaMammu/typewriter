@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db, getNovelSections, novelType, sceneHeading, sectionLabel } from "../lib/db/db";
+import { db, getNovelSections, novelType, sceneHeading, sectionLabel, typeLabel } from "../lib/db/db";
 import { downloadNovelText, safeName, stamp } from "../lib/export/exporters";
 import { downloadBookPdf } from "../lib/export/pdf";
 import { ThemeToggle } from "../components/ui";
@@ -10,6 +10,12 @@ import { charName, hasStructure, type Character } from "../lib/screenplay";
 import type { Section } from "../lib/db/db";
 
 const DIALOGUE = /^([^\d:：]{1,40}?)\s*[:：]\s*(.+)$/;
+
+function Poem({ text }: { text: string }) {
+  const stanzas = text.split(/\n\s*\n/).map((s) => s.replace(/^\n+|\s+$/g, "")).filter((s) => s.trim());
+  if (!stanzas.length) return <p className="muted">(empty)</p>;
+  return <>{stanzas.map((s, i) => <p key={i} className="stanza">{s}</p>)}</>;
+}
 
 function Body({ text, script }: { text: string; script: boolean }) {
   const lines = text.split(/\n+/).filter((p) => p.trim());
@@ -92,13 +98,14 @@ export default function ReadPage() {
 
   const type = novelType(novel);
   const script = type === "screenplay";
+  const poem = type === "poem";
   const words = sections.reduce((a, s) => a + s.wordCount, 0);
 
   return (
     <div className="page read">
       <header className="topbar glass no-print">
         <Link to={`/novel/${id}`} className="btn ghost">← Write</Link>
-        <div className="title"><strong className="ml">{novel.name}</strong><span className="chip hide-sm">{script ? "Screenplay" : "Novel"} · {novel.category}</span></div>
+        <div className="title"><strong className="ml">{novel.name}</strong><span className="chip hide-sm">{typeLabel(type)} · {novel.category}</span></div>
         <div className="spacer" />
         <button className="btn" onClick={() => setSize((s) => Math.max(14, s - 2))}>A−</button>
         <button className="btn" onClick={() => setSize((s) => Math.min(36, s + 2))}>A+</button>
@@ -125,16 +132,16 @@ export default function ReadPage() {
           </ol>
         </aside>
 
-        <article ref={bookRef} className={script ? "book ml script" : "book ml"} style={{ fontSize: size }}>
+        <article ref={bookRef} className={script ? "book ml script" : poem ? "book ml poem" : "book ml"} style={{ fontSize: size }}>
           <h1 className="book-title">{novel.name}</h1>
           <p className="muted book-meta">
-            {script ? "Screenplay" : "Novel"} · {novel.category} · {sections.length} {script ? (sections.length === 1 ? "scene" : "scenes") : (sections.length === 1 ? "section" : "sections")} · {words} words
+            {typeLabel(type)} · {novel.category} · {sections.length} {script ? (sections.length === 1 ? "scene" : "scenes") : poem ? (sections.length === 1 ? "poem" : "poems") : (sections.length === 1 ? "section" : "sections")} · {words} words
           </p>
           {sections.map((s, i) => (
             <section key={s.id} id={`s-${s.id}`} className="chapter">
               <h2>{sectionLabel(type, s, i)}</h2>
               {script && <p className="scene-line">{sceneHeading(s)}</p>}
-              {script && hasStructure(s) ? <Scene s={s} chars={novel.characters ?? []} /> : <Body text={s.content} script={script} />}
+              {script && hasStructure(s) ? <Scene s={s} chars={novel.characters ?? []} /> : poem ? <Poem text={s.content} /> : <Body text={s.content} script={script} />}
             </section>
           ))}
         </article>

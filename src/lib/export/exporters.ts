@@ -1,5 +1,5 @@
 import {
-  db, getNovelSections, novelType, sceneHeading, sectionLabel, type Novel, type NovelType, type Section,
+  db, getNovelSections, novelType, typeLabel, unitName, sceneHeading, sectionLabel, type Novel, type NovelType, type Section,
 } from "../db/db";
 import { IS_NATIVE } from "../../env";
 import { hasStructure, sceneExportBody, type Block, type CastEntry, type Character } from "../screenplay";
@@ -52,7 +52,7 @@ function sectionText(type: NovelType, s: Section, i: number, chars: Character[] 
 
 export function novelToText(novel: Novel, sections: Section[]): string {
   const type = novelType(novel);
-  const parts = [novel.name, `${type === "screenplay" ? "Screenplay" : "Novel"} · ${novel.category}`, "", ""];
+  const parts = [novel.name, `${typeLabel(type)} · ${novel.category}`, "", ""];
   sections.forEach((s, i) => parts.push(sectionText(type, s, i, novel.characters ?? []), "", ""));
   return parts.join("\n");
 }
@@ -134,7 +134,7 @@ export async function importBackup(file: File): Promise<number> {
     const base = name;
     while (existing.has(name)) name = `${base} (${k++})`;
     existing.add(name);
-    const type: NovelType = bn.type === "screenplay" ? "screenplay" : "novel";
+    const type: NovelType = bn.type === "screenplay" || bn.type === "poem" ? bn.type : "novel";
     const now = Date.now();
     const id = crypto.randomUUID();
     const secs = Array.isArray(bn.sections) ? [...bn.sections].sort((a, b) => a.order - b.order) : [];
@@ -146,7 +146,7 @@ export async function importBackup(file: File): Promise<number> {
       const rows: Section[] = (secs.length ? secs : [{ title: "", order: 0, content: "" }]).map((s, i) => {
         const content = String(s.content ?? "");
         const t = content.trim();
-        const unit = type === "screenplay" ? "Scene" : "Chapter";
+        const unit = unitName(type);
         return {
           id: crypto.randomUUID(), novelId: id, title: String(s.title || `${unit} ${i + 1}`), order: i,
           content, wordCount: t ? t.split(/\s+/).length : 0, updatedAt: now,

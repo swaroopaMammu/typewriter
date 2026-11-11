@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
-import { createNovel, db, deleteNovel, novelType, unitName, updateNovel, type Novel, type NovelType } from "../lib/db/db";
+import { createNovel, db, deleteNovel, novelType, NOVEL_TYPES, typeHint, typeLabel, unitName, updateNovel, type Novel, type NovelType } from "../lib/db/db";
 import { downloadAllBackup, downloadNovelBackup, downloadNovelText, importBackup } from "../lib/export/exporters";
 import { CATEGORIES, Confirm, Menu, Modal, ThemeToggle } from "../components/ui";
 
@@ -27,11 +27,11 @@ function NovelForm({ novel, categories, onClose }: { novel: Novel | null; catego
       <form onSubmit={submit} className="form">
         {!novel && (
           <div className="type-pick" role="radiogroup" aria-label="Type">
-            {(["novel", "screenplay"] as NovelType[]).map((t) => (
+            {NOVEL_TYPES.map((t) => (
               <button type="button" key={t} role="radio" aria-checked={type === t}
                 className={type === t ? "type-opt active" : "type-opt"} onClick={() => setType(t)}>
-                <strong>{t === "novel" ? "Novel" : "Screenplay"}</strong>
-                <span className="muted small">{t === "novel" ? "Chapters of prose" : "Scene 1, 2, 3… with INT./EXT. headings"}</span>
+                <strong>{typeLabel(t)}</strong>
+                <span className="muted small">{typeHint(t)}</span>
               </button>
             ))}
           </div>
@@ -116,8 +116,9 @@ export default function IndexPage() {
         <div className="toolbar">
           <input className="search" placeholder="Search novels…" value={q} onChange={(e) => setQ(e.target.value)} />
           <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
-            <option value="all">Novels &amp; screenplays</option>
+            <option value="all">All types</option>
             <option value="novel">Novels</option>
+            <option value="poem">Poetry</option>
             <option value="screenplay">Screenplays</option>
           </select>
           <select value={cat} onChange={(e) => setCat(e.target.value)}>
@@ -133,7 +134,7 @@ export default function IndexPage() {
         {novels && novels.length === 0 && (
           <div className="empty glass">
             <h2>Nothing here yet</h2>
-            <p className="muted">Create a novel or a screenplay, then type in Manglish and watch it appear in Malayalam.</p>
+            <p className="muted">Create a novel, a poetry collection or a screenplay, then type in Manglish and watch it appear in Malayalam.</p>
             <button className="btn primary" onClick={() => setForm("new")}>+ New</button>
           </div>
         )}
@@ -147,7 +148,7 @@ export default function IndexPage() {
                 <div className="card-main" onClick={() => nav(`/novel/${n.id}`)} role="button" tabIndex={0}
                   onKeyDown={(e) => e.key === "Enter" && nav(`/novel/${n.id}`)}>
                   <div className="row">
-                    <span className={novelType(n) === "screenplay" ? "chip solid" : "chip"}>{novelType(n) === "screenplay" ? "Screenplay" : "Novel"}</span>
+                    <span className={novelType(n) === "novel" ? "chip" : "chip solid"}>{typeLabel(novelType(n))}</span>
                     <span className="chip">{n.category}</span>
                   </div>
                   <h3 className="ml">{n.name}</h3>

@@ -301,3 +301,7 @@ input::placeholder { color: var(--muted); }
 .cast-list .who { font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
 .cast-list .look { color: var(--muted); }
 .dlg .paren { font-size: 0.8em; color: var(--muted); }
+
+/* poetry: stanzas keep their line breaks, no paragraph indent */
+.poem .chapter p.stanza { text-indent: 0; white-space: pre-line; margin-bottom: 1.2em; line-height: 1.8; }
+.poem .chapter h2 { text-align: center; }
