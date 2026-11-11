@@ -12,8 +12,116 @@
         document.documentElement.dataset.theme = t;
       } catch (e) {}
     </script>
+    <style>
+      #splash { position: fixed; inset: 0; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 24px;
+        background: var(--bg, #0c0c0e); color: var(--text, #f1f1f3); transition: opacity .5s ease, visibility .5s; }
+      html[data-theme="light"] #splash { --bg: #e9e9ec; --text: #121214; --muted: #62626a; }
+      html[data-theme="dark"] #splash { --bg: #0c0c0e; --text: #f1f1f3; --muted: #9b9ba3; }
+      #splash.done { opacity: 0; visibility: hidden; }
+      #splash .tw-brand { font: 600 13px/1 "Courier New", ui-monospace, monospace; letter-spacing: .3em; text-transform: uppercase; color: var(--muted, #9b9ba3); }
+      #splash .tw-ml { font: 600 clamp(56px, 16vw, 110px)/1.25 "Noto Sans Malayalam", "Malayalam MN", "Kartika", system-ui, sans-serif; min-height: 1.25em; white-space: nowrap; }
+      #splash .tw-keys { font: 500 clamp(16px, 4vw, 22px)/1.4 "Courier New", ui-monospace, monospace; letter-spacing: .12em; color: var(--muted, #9b9ba3); min-height: 1.4em; }
+      #splash .tw-gloss { font: 14px/1.4 system-ui, sans-serif; letter-spacing: .08em; color: var(--muted, #9b9ba3); opacity: 0; transition: opacity .6s ease; }
+      #splash .tw-gloss.show { opacity: 1; }
+      #splash .tw-caret { display: inline-block; width: .08em; height: 1em; margin-left: 4px; vertical-align: -.12em; background: currentColor; animation: tw-blink .7s step-end infinite; }
+      #splash .tw-hint { position: absolute; bottom: 22px; left: 0; right: 0; display: flex; justify-content: center; gap: 14px; align-items: center;
+        font: 12px/1 system-ui, sans-serif; color: var(--muted, #9b9ba3); }
+      #splash .tw-skip { font: inherit; color: inherit; background: none; border: 1px solid currentColor; border-radius: 999px; padding: 6px 12px; opacity: .8; cursor: pointer; }
+      @keyframes tw-blink { 50% { opacity: 0 } }
+      @media (prefers-reduced-motion: reduce) { #splash .tw-caret { animation: none } }
+    </style>
+    <script>
+      /* Typewriter splash: types a line with a key-click sound, rings the bell at the end of each line, then hands over to the app. */
+      (function () {
+        /* ezhuthaam = "let's write". Each step is what the app's own engine shows after that key. */
+        var KEYS = "ezhuthaam";
+        var ML = ["എ", "എസ്", "എഴ്", "എഴു", "എഴുട്", "എഴുത്", "എഴുത", "എഴുതാ", "എഴുതാം"];
+        var reduce = false, ctx = null, typed = false, closed = false;
+        try { reduce = matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) {}
+
+        function audio() {
+          if (ctx) return ctx;
+          try { var C = window.AudioContext || window.webkitAudioContext; if (C) ctx = new C(); } catch (e) {}
+          return ctx;
+        }
+        function click(space) { /* short filtered noise burst + low thump = key strike */
+          var c = ctx; if (!c || c.state !== "running") return;
+          var t = c.currentTime, len = Math.floor(c.sampleRate * 0.03), buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0);
+          for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+          var n = c.createBufferSource(); n.buffer = buf;
+          var f = c.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = (space ? 900 : 2200) + Math.random() * 900; f.Q.value = 0.9;
+          var g = c.createGain(); g.gain.setValueAtTime(space ? 0.35 : 0.6, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+          n.connect(f); f.connect(g); g.connect(c.destination); n.start(t);
+          var o = c.createOscillator(), og = c.createGain(); o.type = "sine"; o.frequency.setValueAtTime(space ? 110 : 150, t);
+          og.gain.setValueAtTime(0.25, t); og.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+          o.connect(og); og.connect(c.destination); o.start(t); o.stop(t + 0.07);
+        }
+        function bell() { /* carriage-return "ding" */
+          var c = ctx; if (!c || c.state !== "running") return;
+          var t = c.currentTime;
+          [2093, 3136].forEach(function (hz, k) {
+            var o = c.createOscillator(), g = c.createGain(); o.type = "sine"; o.frequency.value = hz;
+            g.gain.setValueAtTime(k ? 0.08 : 0.18, t); g.gain.exponentialRampToValueAtTime(0.001, t + 1.1);
+            o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + 1.2);
+          });
+        }
+
+        var el = {};
+        function close() {
+          if (closed) return; closed = true;
+          el.root.classList.add("done");
+          setTimeout(function () { el.root.remove(); }, 700);
+        }
+        function tryClose() { if (typed && window.__twReady) close(); }
+        window.__twTryClose = tryClose;
+
+        function init() {
+          el.root = document.getElementById("splash"); if (!el.root) return;
+          el.ml = el.root.querySelector(".tw-ml"); el.keys = el.root.querySelector(".tw-keys"); el.gloss = el.root.querySelector(".tw-gloss");
+          el.hint = el.root.querySelector(".tw-hint span");
+          var caret = document.createElement("span"); caret.className = "tw-caret";
+          el.root.querySelector(".tw-skip").addEventListener("click", function (e) { e.stopPropagation(); typed = true; window.__twReady = window.__twReady || false; closeNow(); });
+          function closeNow() { if (window.__twReady) close(); else { typed = true; } }
+
+          /* Browsers only allow sound after the visitor touches the page: try now, otherwise enable on the first touch/key. */
+          audio();
+          function unlock() { var c = audio(); if (c && c.state === "suspended") c.resume().then(function () { el.hint.textContent = ""; }); }
+          ["pointerdown", "keydown", "touchstart"].forEach(function (ev) { window.addEventListener(ev, unlock, { passive: true }); });
+          if (ctx && ctx.state === "suspended") { ctx.resume().catch(function () {}); }
+          setTimeout(function () { if (ctx && ctx.state !== "running" && !closed) el.hint.textContent = "Tap anywhere for typewriter sound"; }, 300);
+
+          var i = 0;
+          function show() { el.keys.textContent = KEYS.slice(0, i); el.ml.textContent = ML[i - 1] || ""; el.ml.appendChild(caret); }
+          function step() {
+            if (closed) return;
+            if (i < KEYS.length) {
+              i++; show(); click(false);
+              setTimeout(step, 400 + Math.random() * 120); /* slow, one key at a time */
+            } else {
+              bell(); el.gloss.classList.add("show");
+              setTimeout(function () { typed = true; tryClose(); }, 1500);
+            }
+          }
+          if (reduce) {
+            el.keys.textContent = KEYS; el.ml.textContent = ML[ML.length - 1]; el.gloss.classList.add("show");
+            setTimeout(function () { typed = true; tryClose(); }, 1200);
+          } else {
+            el.ml.appendChild(caret); setTimeout(step, 600);
+          }
+          el.root.addEventListener("click", unlock);
+        }
+        if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
+      })();
+    </script>
   </head>
   <body>
+    <div id="splash" role="status" aria-label="Loading TypeWriter">
+      <div class="tw-brand">TypeWriter</div>
+      <div class="tw-ml" aria-hidden="true"></div>
+      <div class="tw-keys" aria-hidden="true"></div>
+      <div class="tw-gloss" aria-hidden="true">let’s write</div>
+      <div class="tw-hint"><span></span><button type="button" class="tw-skip">Skip</button></div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

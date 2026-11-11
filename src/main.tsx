@@ -22,3 +22,7 @@ createRoot(document.getElementById("root")!).render(
     </Routes>
   </Router>,
 );
+
+// Typewriter splash (see index.html) types its line and then waits for this signal before fading out.
+(window as unknown as { __twReady?: boolean; __twTryClose?: () => void }).__twReady = true;
+(window as unknown as { __twTryClose?: () => void }).__twTryClose?.();

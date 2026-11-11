@@ -11,7 +11,7 @@ import MlField from "../components/MlField";
 import ComposerBar from "../components/ComposerBar";
 import ScriptEditor from "../components/ScriptEditor";
 import CharactersModal from "../components/CharactersModal";
-import { Confirm, Menu, Modal, ThemeToggle } from "../components/ui";
+import { Confirm, Menu, ThemeToggle } from "../components/ui";
 import { IS_ARTIFACT, IS_NATIVE, IS_TOUCH } from "../env";
 
 const KEYS: [string, string][] = [
@@ -31,9 +31,13 @@ const KEYS: [string, string][] = [
   ["_", "force a plain ് (avan_ → അവന്)"],
 ];
 
-function HelpModal({ onClose }: { onClose: () => void }) {
+function GuidePanel({ onClose }: { onClose: () => void }) {
   return (
-    <Modal title="Typing guide" onClose={onClose}>
+    <aside className="guide glass" aria-label="Typing guide">
+      <div className="side-head">
+        <strong>Typing guide</strong>
+        <button className="btn small-btn" onClick={onClose} aria-label="Close typing guide">✕ Close</button>
+      </div>
       <p className="muted small">
         Type the sound in English letters. Capital letters are different sounds (T vs t, L vs l).
         A final n, N, r, l, L becomes a chillu automatically (avan → അവൻ, maram → മരം).
@@ -56,7 +60,7 @@ function HelpModal({ onClose }: { onClose: () => void }) {
           ))}
         </tbody>
       </table>
-    </Modal>
+    </aside>
   );
 }
 
@@ -69,7 +73,13 @@ export default function WritePage() {
   const [mode, setMode] = useState<"ml" | "en">("ml");
   const [saved, setSaved] = useState(true);
   const [liveWords, setLiveWords] = useState(0);
-  const [help, setHelp] = useState(false);
+  const [help, setHelp] = useState(() => {
+    try { return localStorage.getItem("tw-guide") === "1"; } catch { return false; }
+  });
+  const toggleHelp = () => setHelp((h) => {
+    try { localStorage.setItem("tw-guide", h ? "0" : "1"); } catch { /* ignore */ }
+    return !h;
+  });
   const [online, setOnline] = useState(() => {
     try { return localStorage.getItem("tw-online") === "1"; } catch { return false; }
   });
@@ -179,7 +189,7 @@ export default function WritePage() {
         )}
         <span className="muted small status hide-sm">{saved ? "Saved" : "Saving…"} · {liveWords} / {total} words</span>
         {isScript && <button className="btn" onClick={() => setCast(true)}>Characters</button>}
-        <button className="btn hide-sm" onClick={() => setHelp(true)}>Typing guide</button>
+        <button className="btn hide-sm" aria-pressed={help} onClick={toggleHelp}>{help ? "Hide guide" : "Typing guide"}</button>
         <button className="btn" onClick={async () => { await flush(); nav(`/novel/${id}/read`); }}>Read</button>
         <Menu label="Download" items={[
           { label: "Whole novel (.txt)", onClick: async () => { await flush(); downloadNovelText(id); } },
@@ -191,6 +201,7 @@ export default function WritePage() {
       </header>
 
       <div className="workspace">
+        {help && <GuidePanel onClose={toggleHelp} />}
         <aside className={drawer ? "sidebar glass open" : "sidebar glass"}>
           <div className="side-head">
             <strong>{unit}s</strong>
@@ -258,7 +269,6 @@ export default function WritePage() {
 
       {IS_TOUCH && <ComposerBar mode={mode} online={online && !IS_ARTIFACT} onToggleMode={() => setMode((m) => (m === "ml" ? "en" : "ml"))} />}
       {cast && <CharactersModal novelId={id} characters={novel.characters ?? []} mode={mode} online={online && !IS_ARTIFACT} onClose={() => setCast(false)} />}
-      {help && <HelpModal onClose={() => setHelp(false)} />}
       {delSec && (
         <Confirm title={`Delete ${unit.toLowerCase()}?`} confirmLabel={`Delete ${unit.toLowerCase()}`}
           message={`${unit} ${sections.findIndex((s) => s.id === delSec) + 1} will be permanently deleted.`}

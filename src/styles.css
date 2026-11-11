@@ -305,3 +305,9 @@ input::placeholder { color: var(--muted); }
 /* poetry: stanzas keep their line breaks, no paragraph indent */
 .poem .chapter p.stanza { text-indent: 0; white-space: pre-line; margin-bottom: 1.2em; line-height: 1.8; }
 .poem .chapter h2 { text-align: center; }
+
+/* typing guide: collapsible panel on the left */
+.guide { width: 300px; flex: none; padding: 12px; position: sticky; top: 76px; max-height: calc(100vh - 92px); overflow: auto; }
+.guide .keys { width: 100%; margin-top: 8px; }
+@media (max-width: 900px) { .guide { width: 100%; position: static; max-height: none; } }
+@media (max-width: 640px) { .guide { display: none; } }

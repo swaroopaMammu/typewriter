@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { createNovel, db, deleteNovel, novelType, NOVEL_TYPES, typeHint, typeLabel, unitName, updateNovel, type Novel, type NovelType } from "../lib/db/db";
+import { importDocument, titleFromFile, type ImportMode } from "../lib/import/document";
 import { downloadAllBackup, downloadNovelBackup, downloadNovelText, importBackup } from "../lib/export/exporters";
 import { CATEGORIES, Confirm, Menu, Modal, ThemeToggle } from "../components/ui";
 
@@ -52,6 +53,67 @@ function NovelForm({ novel, categories, onClose }: { novel: Novel | null; catego
   );
 }
 
+function ImportDocForm({ file, categories, onClose }: { file: File; categories: string[]; onClose: () => void }) {
+  const nav = useNavigate();
+  const [name, setName] = useState(titleFromFile(file.name));
+  const [category, setCategory] = useState("");
+  const [type, setType] = useState<NovelType>("novel");
+  const [mode, setMode] = useState<ImportMode>("convert");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const ok = name.trim() && category.trim() && !busy;
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!ok) return;
+    setBusy(true);
+    setErr("");
+    try {
+      const id = await importDocument(file, { title: name, category, type, mode });
+      nav(`/novel/${id}/read`);
+    } catch (x) {
+      setErr((x as Error).message || "Could not read that file.");
+      setBusy(false);
+    }
+  }
+  return (
+    <Modal title="Import document" onClose={onClose}>
+      <form onSubmit={submit} className="form">
+        <p className="muted small">{file.name} · read on this device only, nothing is uploaded.</p>
+        <div className="type-pick" role="radiogroup" aria-label="Text">
+          {([["convert", "Convert to Malayalam", "English-letter (Manglish) words become Malayalam; Malayalam stays as is"],
+             ["keep", "Keep as it is", "Store the text exactly as written in the file"]] as [ImportMode, string, string][]).map(([m, t, d]) => (
+            <button type="button" key={m} role="radio" aria-checked={mode === m}
+              className={mode === m ? "type-opt active" : "type-opt"} onClick={() => setMode(m)}>
+              <strong>{t}</strong><span className="muted small">{d}</span>
+            </button>
+          ))}
+        </div>
+        <div className="type-pick" role="radiogroup" aria-label="Type">
+          {NOVEL_TYPES.filter((t) => t !== "screenplay").map((t) => (
+            <button type="button" key={t} role="radio" aria-checked={type === t}
+              className={type === t ? "type-opt active" : "type-opt"} onClick={() => setType(t)}>
+              <strong>{typeLabel(t)}</strong><span className="muted small">{typeHint(t)}</span>
+            </button>
+          ))}
+        </div>
+        <label>Name
+          <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Title (Malayalam or English)" />
+        </label>
+        <label>Category
+          <input list="cats-imp" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Pick or type your own" />
+          <datalist id="cats-imp">{categories.map((c) => <option key={c} value={c} />)}</datalist>
+        </label>
+        <p className="muted small">It opens as a {type === "poem" ? "poetry collection" : "novel"}, split into {type === "poem" ? "poems" : "chapters"} at headings like “Chapter 1”.</p>
+        {err && <p className="small" role="alert">{err}</p>}
+        <div className="row end">
+          <button type="button" className="btn" onClick={onClose}>Cancel</button>
+          <button type="submit" className="btn primary" disabled={!ok}>{busy ? "Importing…" : "Import & read"}</button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 export default function IndexPage() {
   const nav = useNavigate();
   const novels = useLiveQuery(() => db.novels.toArray(), []);
@@ -72,6 +134,7 @@ export default function IndexPage() {
   const [del, setDel] = useState<Novel | null>(null);
   const [notice, setNotice] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const [docFile, setDocFile] = useState<File | null>(null);
 
   const categories = useMemo(
     () => Array.from(new Set([...CATEGORIES, ...(novels ?? []).map((n) => n.category)])),
@@ -90,6 +153,10 @@ export default function IndexPage() {
     const f = e.target.files?.[0];
     e.target.value = "";
     if (!f) return;
+    if (!/\.json$/i.test(f.name) && f.type !== "application/json") {
+      setDocFile(f); // .txt / .md / .pdf: ask how to import it
+      return;
+    }
     try {
       const n = await importBackup(f);
       setNotice(`Imported ${n} novel${n === 1 ? "" : "s"}.`);
@@ -105,7 +172,7 @@ export default function IndexPage() {
         <div className="brand">TypeWriter <span className="ml hide-sm">ടൈപ്പ്റൈറ്റർ</span></div>
         <div className="spacer" />
         {notice && <span className="muted small">{notice}</span>}
-        <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={onImport} />
+        <input ref={fileRef} type="file" accept=".json,application/json,.txt,.md,text/plain,.pdf,application/pdf" hidden onChange={onImport} />
         <button className="btn" onClick={() => fileRef.current?.click()}>Import</button>
         <button className="btn hide-sm" onClick={() => downloadAllBackup()} disabled={!novels?.length}>Backup all</button>
         <ThemeToggle />
@@ -173,6 +240,7 @@ export default function IndexPage() {
         </div>
       </main>
 
+      {docFile && <ImportDocForm file={docFile} categories={categories} onClose={() => setDocFile(null)} />}
       {form && <NovelForm novel={form === "new" ? null : form} categories={categories} onClose={() => setForm(null)} />}
       {del && (
         <Confirm title="Delete this project?" confirmLabel="Delete"
