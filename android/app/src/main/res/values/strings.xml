@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">TypeWriter</string>
+    <string name="title_activity_main">TypeWriter</string>
+    <string name="package_name">com.typewriter.manglish</string>
+    <string name="custom_url_scheme">com.typewriter.manglish</string>
+</resources>
