@@ -12,7 +12,7 @@ export function useTheme() {
 export function ThemeToggle() {
   const [theme, toggle] = useTheme();
   return (
-    <button className="btn" onClick={toggle} title="Switch light / dark">
+    <button className="btn" onClick={toggle} title="Switch between light and dark">
       {theme === "dark" ? "Light" : "Dark"}
     </button>
   );

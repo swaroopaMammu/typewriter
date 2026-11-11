@@ -1,5 +1,3 @@
-import { getTarget } from "../../components/target";
-import { IS_TOUCH } from "../../env";
 
 type Field = HTMLInputElement | HTMLTextAreaElement;
 
@@ -27,9 +25,7 @@ export function trackFields() {
   });
 }
 
-function currentField(): { el: Field; onChange?: (v: string) => void } | null {
-  const t = getTarget(); // phone: the field the typing bar writes into
-  if (IS_TOUCH && t) return { el: t.el, onChange: t.onChange };
+function currentField(): { el: Field } | null {
   if (last?.isConnected) return { el: last };
   const first = document.querySelector<Field>(EDITABLE);
   return first ? { el: first } : null;
@@ -45,10 +41,7 @@ export function insertDictation(spoken: string): boolean {
   const r = spliceDictation(el.value, start, end, spoken);
   if (!r) return true;
   el.focus();
-  if (el.readOnly || f.onChange) { // phone fields only change through their own onChange (native input is blocked)
-    el.value = r.value;
-    f.onChange?.(r.value);
-  } else {
+  {
     el.setSelectionRange(start, end);
     try { document.execCommand("insertText", false, r.insert); } catch { /* fall through */ }
     if (el.value !== r.value) {

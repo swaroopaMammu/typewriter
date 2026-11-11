@@ -1,8 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { isWordChar } from "../lib/translit/engine";
 import { buildCandidates, fetchOnline } from "../lib/translit/suggest";
 import { loadLearned, saveLearned } from "../lib/translit/learned";
 import { caretCoords } from "./caret";
+import { IS_TOUCH } from "../env";
+import { TIP_MS } from "../lib/tips";
 
 type El = HTMLTextAreaElement | HTMLInputElement;
 
@@ -18,10 +21,19 @@ interface Props {
   autoFocus?: boolean;
   /** Ctrl/Cmd+Enter (used for "next speaker" in screenplays) */
   onCtrlEnter?: () => void;
+  /** plain Enter in a single-line field (e.g. "add this character"); receives the field's final text */
+  onEnter?: (value: string) => void;
+  /** with onEnter: empty this same field right away, so the next name can be typed at once (focus never leaves it) */
+  clearOnEnter?: boolean;
 }
 
 interface St { start: number; buf: string; len: number; cands: string[]; sel: number }
 const empty = (): St => ({ start: 0, buf: "", len: 0, cands: [], sel: 0 });
+
+// The "pick a suggestion by its number" hint shows on every page load (reload included), but only once per load.
+let suggestHintShown = false;
+
+let programmatic = false; // true while we insert text ourselves, so the beforeinput handler leaves it alone
 
 /** Replace [from,to) with text, keeping the browser undo stack when possible. */
 function replaceRange(el: El, from: number, to: number, text: string) {
@@ -29,11 +41,14 @@ function replaceRange(el: El, from: number, to: number, text: string) {
   const expected = before.slice(0, from) + text + before.slice(to);
   el.focus();
   el.setSelectionRange(from, to);
+  programmatic = true;
   try {
     if (text === "") { if (from !== to) document.execCommand("delete"); }
     else document.execCommand("insertText", false, text);
   } catch {
     /* fall through to the check below */
+  } finally {
+    programmatic = false;
   }
   // Browsers can mishandle combining marks (e.g. a lone ം) and snap the selection to grapheme
   // boundaries. Whatever happened, force the exact text we intended.
@@ -47,11 +62,16 @@ function replaceRange(el: El, from: number, to: number, text: string) {
 
 interface Popup { cands: string[]; sel: number; left: number; top: number; bottom: number }
 
-export default function MalayalamEditor({ initial, mode, online, onChange, single, className, placeholder, autoFocus, onCtrlEnter }: Props) {
+export default function MalayalamEditor({ initial, mode, online, onChange, single, className, placeholder, autoFocus, onCtrlEnter, onEnter, clearOnEnter }: Props) {
   const ref = useRef<El>(null);
   const st = useRef<St>(empty());
   const timer = useRef<number | undefined>(undefined);
   const [popup, setPopup] = useState<Popup | null>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+  const [sugTip, setSugTip] = useState(false);
+  const tipRef = useRef<HTMLDivElement>(null);
+  const tipAnchor = useRef({ left: 0, top: 0, bottom: 0 });
+  const sugTipTimer = useRef<number | undefined>(undefined);
 
   const reset = () => {
     window.clearTimeout(timer.current);
@@ -65,9 +85,9 @@ export default function MalayalamEditor({ initial, mode, online, onChange, singl
   function showPopup(el: El) {
     const s = st.current;
     if (!s.buf) { setPopup(null); return; }
-    const c = caretCoords(el, s.start);
+    const c = caretCoords(el, s.start + s.len);
     const r = el.getBoundingClientRect();
-    setPopup({ cands: s.cands, sel: s.sel, left: r.left + c.left, top: r.top + c.top, bottom: r.top + c.top + c.height });
+    setPopup({ cands: IS_TOUCH ? s.cands.slice(0, 6) : s.cands, sel: s.sel, left: r.left + c.left, top: r.top + c.top, bottom: r.top + c.top + c.height });
   }
 
   function scheduleOnline(el: El, buf: string) {
@@ -121,9 +141,65 @@ export default function MalayalamEditor({ initial, mode, online, onChange, singl
     reset();
   }
 
+  /** Backspace inside the word being typed: drop its last Manglish letter. Returns false when not applicable. */
+  function backspaceWord(el: El): boolean {
+    const s = st.current;
+    const active = mode === "ml" && !!s.buf && el.selectionStart === el.selectionEnd && el.selectionStart === s.start + s.len;
+    if (!active) return false;
+    const buf = s.buf.slice(0, -1);
+    if (!buf) {
+      replaceRange(el, s.start, s.start + s.len, "");
+      reset();
+    } else {
+      const cands = buildCandidates(buf, online);
+      replaceRange(el, s.start, s.start + s.len, cands[0]);
+      st.current = { start: s.start, buf, len: cands[0].length, cands, sel: 0 };
+      showPopup(el);
+      scheduleOnline(el, buf);
+    }
+    return true;
+  }
+
+  // ---- phone keyboards: no usable keydown, so read the browser's beforeinput / composition events instead
+  const beforeInput = useRef<(e: InputEvent) => void>(() => {});
+  beforeInput.current = (e) => {
+    const el = ref.current;
+    if (!el || mode !== "ml" || programmatic || e.isComposing) return;
+    if (e.inputType === "insertText" && e.data && e.data.length === 1 && isWordChar(e.data)) {
+      e.preventDefault(); // one typed key: run it through the Manglish engine instead
+      typeLetter(el, e.data);
+    } else if (e.inputType === "deleteContentBackward") {
+      if (backspaceWord(el)) e.preventDefault(); else if (st.current.buf) reset();
+    }
+  };
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const f = (e: Event) => beforeInput.current(e as InputEvent);
+    el.addEventListener("beforeinput", f);
+    return () => el.removeEventListener("beforeinput", f);
+  }, []);
+
+  /** Some keyboards compose a whole word (predictive text). When it ends, re-type those letters through the engine. */
+  function onCompositionEnd(e: React.CompositionEvent<El>) {
+    const el = e.currentTarget;
+    const data = e.data || "";
+    if (mode !== "ml" || !/[A-Za-z~_]/.test(data)) return;
+    const caret = el.selectionStart ?? 0;
+    const from = caret - data.length;
+    if (from < 0 || el.value.slice(from, caret) !== data) return;
+    reset();
+    replaceRange(el, from, caret, "");
+    for (const ch of data) {
+      if (isWordChar(ch)) typeLetter(el, ch);
+      else { commit(el); const at = el.selectionStart ?? 0; replaceRange(el, at, at, ch); }
+    }
+  }
+
   function onKeyDown(e: React.KeyboardEvent<El>) {
     const el = e.currentTarget;
     if (e.nativeEvent.isComposing) return;
+    if (e.key === "Unidentified" || e.nativeEvent.keyCode === 229) return; // soft keyboard: handled in beforeinput
     const s = st.current;
     const mods = e.ctrlKey || e.metaKey || e.altKey;
 
@@ -131,6 +207,15 @@ export default function MalayalamEditor({ initial, mode, online, onChange, singl
       e.preventDefault();
       commit(el);
       onCtrlEnter();
+      return;
+    }
+
+    if (onEnter && single && e.key === "Enter" && !mods && !e.shiftKey) {
+      e.preventDefault();
+      commit(el); // finish the word being typed, then hand over the whole text
+      const text = el.value;
+      if (text.trim() && clearOnEnter) replaceRange(el, 0, el.value.length, "");
+      onEnter(text);
       return;
     }
 
@@ -161,24 +246,58 @@ export default function MalayalamEditor({ initial, mode, online, onChange, singl
       commit(el);
     } else if (e.key === "Backspace") {
       e.preventDefault();
-      const buf = s.buf.slice(0, -1);
-      if (!buf) {
-        replaceRange(el, s.start, s.start + s.len, "");
-        reset();
-      } else {
-        const cands = buildCandidates(buf, online);
-        replaceRange(el, s.start, s.start + s.len, cands[0]);
-        st.current = { start: s.start, buf, len: cands[0].length, cands, sel: 0 };
-        showPopup(el);
-        scheduleOnline(el, buf);
-      }
+      backspaceWord(el);
     } else {
       // space, enter, punctuation, arrows...: accept the word, then let the key do its normal job
       commit(el);
     }
   }
 
-  const flip = popup && popup.bottom + 8 + popup.cands.length * 34 > window.innerHeight;
+  // first time suggestions appear after the page loads: say, for 3 seconds, that a word or its number can be clicked
+  useEffect(() => {
+    if (!popup || suggestHintShown) return;
+    suggestHintShown = true;
+    tipAnchor.current = { left: popup.left, top: popup.top, bottom: popup.bottom };
+    setSugTip(true);
+    sugTipTimer.current = window.setTimeout(() => setSugTip(false), TIP_MS);
+  }, [popup !== null]); // eslint-disable-line
+  useEffect(() => () => window.clearTimeout(sugTipTimer.current), []);
+
+  // vertical dropdown right at the cursor: just below the line, or just above it when there is no room below
+  // (e.g. the phone keyboard covers the lower part of the screen). Always kept inside the screen.
+  useLayoutEffect(() => {
+    const el = popRef.current;
+    if (!el || !popup) return;
+    const vv = window.visualViewport;
+    const vw = vv?.width ?? window.innerWidth;
+    const top0 = vv?.offsetTop ?? 0;
+    const bottom0 = top0 + (vv?.height ?? window.innerHeight);
+    const r = el.getBoundingClientRect();
+    const roomBelow = bottom0 - popup.bottom - 6;
+    const roomAbove = popup.top - top0 - 6;
+    const above = r.height > roomBelow && roomAbove > roomBelow;
+    el.style.left = `${Math.max(8, Math.min(popup.left, vw - 8 - r.width))}px`;
+    el.style.top = `${above ? Math.max(top0 + 4, popup.top - r.height - 2) : popup.bottom + 2}px`;
+  }, [popup, sugTip]);
+
+  // The hint bubble: above the line being typed, or below the dropdown when there is no clear room above. It follows the
+  // dropdown as it grows, and stays the full 3 seconds even if the dropdown closes first (fast typing closes it at Space).
+  // Declared after the dropdown's own placement effect so it reads the dropdown's final position.
+  useLayoutEffect(() => {
+    const el = tipRef.current;
+    if (!el || !sugTip) return;
+    const a = tipAnchor.current;
+    const left = popup?.left ?? a.left;
+    const vw = window.visualViewport?.width ?? window.innerWidth;
+    const r = el.getBoundingClientRect();
+    const minTop = (document.querySelector(".topbar")?.getBoundingClientRect().bottom ?? 0) + 8; // keep clear of the toolbar
+    const above = (popup?.top ?? a.top) - r.height - 12;
+    const below = popRef.current ? popRef.current.getBoundingClientRect().bottom + 10 : a.bottom + 8;
+    el.style.left = `${Math.max(8, Math.min(left, vw - 8 - r.width))}px`;
+    el.style.top = `${above >= minTop ? above : below}px`;
+    el.classList.toggle("flip", above < minTop);
+  }, [sugTip, popup]);
+
 
   const common = {
     lang: "ml",
@@ -189,7 +308,13 @@ export default function MalayalamEditor({ initial, mode, online, onChange, singl
     onMouseDown: () => { const el = ref.current; if (el) commit(el); },
     onBlur: () => { const el = ref.current; if (el) commit(el); },
     onInput: (e: React.FormEvent<El>) => onChange(e.currentTarget.value),
-    placeholder: placeholder ?? (mode === "ml" ? "Type in Manglish… e.g. namaskaram" : "Type in English…"),
+    placeholder: placeholder ?? (mode === "ml" ? "Type in English letters… e.g. namaskaram" : "Start writing…"),
+    onCompositionEnd,
+    ...(onEnter ? { enterKeyHint: "done" as const } : {}),
+    autoCapitalize: "none",
+    autoCorrect: "off",
+    // Malayalam mode: the "email" keyboard has no predictive text or autocorrect, so letters reach us one at a time
+    ...(IS_TOUCH && mode === "ml" ? { inputMode: "email" as const } : {}),
   };
 
   return (
@@ -199,23 +324,33 @@ export default function MalayalamEditor({ initial, mode, online, onChange, singl
       ) : (
         <textarea ref={ref as React.RefObject<HTMLTextAreaElement>} className={className ?? "editor"} {...common} />
       )}
-      {popup && (
+      {popup && createPortal(
         <div
+          ref={popRef}
           className="suggest glass"
-          style={flip ? { left: popup.left, bottom: window.innerHeight - popup.top + 4 } : { left: popup.left, top: popup.bottom + 4 }}
-          onMouseDown={(e) => e.preventDefault()}
+          style={{ left: popup.left, top: popup.bottom + 2 }}
+          onPointerDown={(e) => e.preventDefault()}
         >
           {popup.cands.map((c, i) => (
             <div
               key={c}
               className={i === popup.sel ? "sug active" : "sug"}
-              onMouseDown={(e) => { e.preventDefault(); const el = ref.current; if (el) { st.current = { ...st.current, sel: i }; commit(el); } }}
+              onPointerDown={(e) => { e.preventDefault(); const el = ref.current; if (el) { st.current = { ...st.current, sel: i }; commit(el); } }}
             >
               <span className="k">{i + 1}</span>
               <span className="ml">{c}</span>
             </div>
           ))}
-        </div>
+        </div>,
+        document.body,
+      )}
+      {sugTip && createPortal(
+        <div ref={tipRef} className="tip tip-float" role="status">
+          {IS_TOUCH
+            ? "Tap a word, or its number, to pick it. Space takes the first one."
+            : "Pick a word by clicking it or pressing its number (1–9). Press Space to take the first one."}
+        </div>,
+        document.body,
       )}
     </>
   );

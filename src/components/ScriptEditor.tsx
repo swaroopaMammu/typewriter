@@ -100,8 +100,8 @@ export default function ScriptEditor({ section, characters, mode, online, onAddC
     if (latest.current.cast.some((c) => c.id === id)) return;
     update({ cast: [...latest.current.cast, { id }] });
   }
-  async function createCharacter() {
-    const name = newName.trim();
+  async function createCharacter(typed?: string) {
+    const name = (typed ?? newName).trim();
     if (!name) return;
     const id = await onAddCharacter(name);
     addToCast(id);
@@ -115,20 +115,20 @@ export default function ScriptEditor({ section, characters, mode, online, onAddC
   return (
     <div className="script-ed">
       <section className="card-lite">
-        <label className="field-label">Scene setup</label>
+        <label className="field-label">Setting the scene</label>
         <MlField multiline mode={mode} online={online} className="blk-text" initial={st.setup}
-          placeholder="Where are we, what's around, the mood, props, lighting…"
+          placeholder="Describe the place: what's around, the mood, props, lighting…"
           onChange={(v) => update({ setup: v })} />
       </section>
 
       <section className="card-lite">
-        <label className="field-label">Characters in this scene</label>
-        {castChars.length === 0 && <p className="muted small">Add the characters who appear, then write what each one wears or looks like.</p>}
+        <label className="field-label">Who is in this scene</label>
+        {castChars.length === 0 && <p className="muted small">Add the characters who appear, then note what each one wears or looks like.</p>}
         {castChars.map((c) => (
           <div className="cast-row" key={c.id}>
             <span className="who-chip ml">{c.name || "?"}</span>
             <MlField mode={mode} online={online} className="editor-line" initial={c.look ?? ""}
-              placeholder="Costume / look in this scene"
+              placeholder="What they wear or look like here"
               onChange={(v) => update({ cast: latest.current.cast.map((x) => (x.id === c.id ? { ...x, look: v } : x)) })} />
             <button className="icon-btn" title="Remove from scene" onClick={() => update({ cast: latest.current.cast.filter((x) => x.id !== c.id) })}>✕</button>
           </div>
@@ -140,10 +140,11 @@ export default function ScriptEditor({ section, characters, mode, online, onAddC
           {!adding && <button className="btn small-btn" onClick={() => setAdding(true)}>+ New character</button>}
         </div>
         {adding && (
-          <div className="cast-row">
+          <div className="cast-row" onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); setAdding(false); setNewName(""); } }}>
             <MlField mode={mode} online={online} className="editor-line" initial="" autoFocus
-              placeholder="Character name" onChange={setNewName} onCtrlEnter={createCharacter} />
-            <button className="btn primary small-btn" onClick={createCharacter}>Add</button>
+              placeholder="Type a name, then press Enter" onChange={setNewName}
+              onEnter={(v) => createCharacter(v)} onCtrlEnter={() => createCharacter()} />
+            <button className="btn primary small-btn" onClick={() => createCharacter()}>Add</button>
             <button className="btn small-btn" onClick={() => { setAdding(false); setNewName(""); }}>Cancel</button>
           </div>
         )}
@@ -151,7 +152,7 @@ export default function ScriptEditor({ section, characters, mode, online, onAddC
 
       <section className="blocks">
         {st.blocks.length === 0 && (
-          <p className="muted small">Add action or dialogue below. {IS_TOUCH ? "" : "Tip: Ctrl+Enter starts the next line with the next speaker."}</p>
+          <p className="muted small">Start writing below: add an action, or pick a character to give them a line. {IS_TOUCH ? "" : "Tip: Ctrl+Enter starts the next line for the next speaker."}</p>
         )}
         {st.blocks.map((b, i) => (
           <div className={b.kind === "dialogue" ? "block dialogue" : "block action"} key={b.id}>
@@ -165,15 +166,15 @@ export default function ScriptEditor({ section, characters, mode, online, onAddC
                     ))}
                   </select>
                   <MlField mode={mode} online={online} className="editor-line paren" initial={b.paren ?? ""}
-                    placeholder="(how they say it)" onChange={(v) => patchBlock(b.id, { paren: v })} />
+                    placeholder="(how they say it, e.g. softly)" onChange={(v) => patchBlock(b.id, { paren: v })} />
                 </>
               ) : (
-                <span className="field-label">Action</span>
+                <span className="field-label">What happens</span>
               )}
               <span className="spacer" />
               <button className="icon-btn" title="Move up" disabled={i === 0} onClick={() => moveBlock(i, -1)}>↑</button>
               <button className="icon-btn" title="Move down" disabled={i === st.blocks.length - 1} onClick={() => moveBlock(i, 1)}>↓</button>
-              <button className="icon-btn" title="Delete" onClick={() => removeBlock(b.id)}>✕</button>
+              <button className="icon-btn" title="Delete this line" onClick={() => removeBlock(b.id)}>✕</button>
             </div>
             <MlField multiline mode={mode} online={online} className="blk-text" initial={b.text} autoFocus={focusId === b.id}
               placeholder={b.kind === "dialogue" ? "What they say" : "What happens"}
@@ -187,7 +188,7 @@ export default function ScriptEditor({ section, characters, mode, online, onAddC
         {castChars.map((c) => (
           <button key={c.id} className="btn small-btn ml" onClick={() => addBlock("dialogue", c.id)}>+ {c.name}</button>
         ))}
-        {castChars.length === 0 && <span className="muted small">Add characters above to write their dialogue.</span>}
+        {castChars.length === 0 && <span className="muted small">Add characters above to give them lines.</span>}
       </div>
     </div>
   );

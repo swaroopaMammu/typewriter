@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { createNovel, db, deleteNovel, novelType, NOVEL_TYPES, typeHint, typeLabel, unitName, updateNovel, type Novel, type NovelType } from "../lib/db/db";
+import Tipped from "../components/Tip";
 import { importDocument, titleFromFile, type ImportMode } from "../lib/import/document";
 import { downloadAllBackup, downloadNovelBackup, downloadNovelText, importBackup } from "../lib/export/exporters";
 import { CATEGORIES, Confirm, Menu, Modal, ThemeToggle } from "../components/ui";
@@ -24,7 +25,7 @@ function NovelForm({ novel, categories, onClose }: { novel: Novel | null; catego
     }
   }
   return (
-    <Modal title={novel ? "Edit details" : "New project"} onClose={onClose}>
+    <Modal title={novel ? "Edit details" : "Start something new"} onClose={onClose}>
       <form onSubmit={submit} className="form">
         {!novel && (
           <div className="type-pick" role="radiogroup" aria-label="Type">
@@ -38,15 +39,15 @@ function NovelForm({ novel, categories, onClose }: { novel: Novel | null; catego
           </div>
         )}
         <label>Name
-          <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Title (Malayalam or English)" />
+          <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Give it a title (Malayalam or English)" />
         </label>
         <label>Category
-          <input list="cats" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Pick or type your own" />
+          <input list="cats" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Pick one or type your own" />
           <datalist id="cats">{categories.map((c) => <option key={c} value={c} />)}</datalist>
         </label>
         <div className="row end">
           <button type="button" className="btn" onClick={onClose}>Cancel</button>
-          <button type="submit" className="btn primary" disabled={!ok}>{novel ? "Save" : "Create & write"}</button>
+          <button type="submit" className="btn primary" disabled={!ok}>{novel ? "Save" : "Create and start writing"}</button>
         </div>
       </form>
     </Modal>
@@ -76,12 +77,12 @@ function ImportDocForm({ file, categories, onClose }: { file: File; categories: 
     }
   }
   return (
-    <Modal title="Import document" onClose={onClose}>
+    <Modal title="Bring in a file" onClose={onClose}>
       <form onSubmit={submit} className="form">
-        <p className="muted small">{file.name} · read on this device only, nothing is uploaded.</p>
+        <p className="muted small">{file.name} · Your file is read on this device and is never uploaded.</p>
         <div className="type-pick" role="radiogroup" aria-label="Text">
-          {([["convert", "Convert to Malayalam", "English-letter (Manglish) words become Malayalam; Malayalam stays as is"],
-             ["keep", "Keep as it is", "Store the text exactly as written in the file"]] as [ImportMode, string, string][]).map(([m, t, d]) => (
+          {([["convert", "Convert to Malayalam", "Turn English letters into Malayalam. Text already in Malayalam is left as it is."],
+             ["keep", "Keep as it is", "Keep the text exactly as it is written in the file."]] as [ImportMode, string, string][]).map(([m, t, d]) => (
             <button type="button" key={m} role="radio" aria-checked={mode === m}
               className={mode === m ? "type-opt active" : "type-opt"} onClick={() => setMode(m)}>
               <strong>{t}</strong><span className="muted small">{d}</span>
@@ -103,11 +104,11 @@ function ImportDocForm({ file, categories, onClose }: { file: File; categories: 
           <input list="cats-imp" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Pick or type your own" />
           <datalist id="cats-imp">{categories.map((c) => <option key={c} value={c} />)}</datalist>
         </label>
-        <p className="muted small">It opens as a {type === "poem" ? "poetry collection" : "novel"}, split into {type === "poem" ? "poems" : "chapters"} at headings like “Chapter 1”.</p>
+        <p className="muted small">It opens as a {type === "poem" ? "poetry collection" : "novel"}, split into {type === "poem" ? "poems" : "chapters"} wherever a heading like “Chapter 1” appears.</p>
         {err && <p className="small" role="alert">{err}</p>}
         <div className="row end">
           <button type="button" className="btn" onClick={onClose}>Cancel</button>
-          <button type="submit" className="btn primary" disabled={!ok}>{busy ? "Importing…" : "Import & read"}</button>
+          <button type="submit" className="btn primary" disabled={!ok}>{busy ? "Bringing it in…" : "Import and read"}</button>
         </div>
       </form>
     </Modal>
@@ -173,10 +174,14 @@ export default function IndexPage() {
         <div className="spacer" />
         {notice && <span className="muted small">{notice}</span>}
         <input ref={fileRef} type="file" accept=".json,application/json,.txt,.md,text/plain,.pdf,application/pdf" hidden onChange={onImport} />
-        <button className="btn" onClick={() => fileRef.current?.click()}>Import</button>
+        <Tipped id="import" order={1} text="Import a .txt or .pdf file and convert it to Malayalam, or keep it as it is">
+          <button className="btn" onClick={() => fileRef.current?.click()}>Import</button>
+        </Tipped>
         <button className="btn hide-sm" onClick={() => downloadAllBackup()} disabled={!novels?.length}>Backup all</button>
         <ThemeToggle />
-        <button className="btn primary" onClick={() => setForm("new")}>+ New</button>
+        <Tipped id="new" order={2} text="Start a novel, a poetry collection or a screenplay">
+          <button className="btn primary" onClick={() => setForm("new")}>+ New</button>
+        </Tipped>
       </header>
 
       <main className="container">
@@ -200,12 +205,12 @@ export default function IndexPage() {
 
         {novels && novels.length === 0 && (
           <div className="empty glass">
-            <h2>Nothing here yet</h2>
-            <p className="muted">Create a novel, a poetry collection or a screenplay, then type in Manglish and watch it appear in Malayalam.</p>
-            <button className="btn primary" onClick={() => setForm("new")}>+ New</button>
+            <h2>Your story starts here</h2>
+            <p className="muted">Write a novel, a book of poems or a screenplay. Type in English letters and watch them turn into Malayalam as you go.</p>
+            <button className="btn primary" onClick={() => setForm("new")}>+ Start writing</button>
           </div>
         )}
-        {novels && novels.length > 0 && list.length === 0 && <p className="muted">Nothing matches your search.</p>}
+        {novels && novels.length > 0 && list.length === 0 && <p className="muted">No matches found. Try a different word, or clear the filters.</p>}
 
         <div className="grid">
           {list.map((n) => {
@@ -231,7 +236,7 @@ export default function IndexPage() {
                     { label: "Novel as text (.txt)", onClick: () => downloadNovelText(n.id) },
                     { label: "Backup (.json)", onClick: () => downloadNovelBackup(n.id) },
                   ]} />
-                  <button className="btn ghost" onClick={() => setForm(n)} title="Edit name / category">Edit</button>
+                  <button className="btn ghost" onClick={() => setForm(n)} title="Change the name or category">Edit</button>
                   <button className="btn ghost" onClick={() => setDel(n)} title="Delete">Delete</button>
                 </div>
               </article>
@@ -244,7 +249,7 @@ export default function IndexPage() {
       {form && <NovelForm novel={form === "new" ? null : form} categories={categories} onClose={() => setForm(null)} />}
       {del && (
         <Confirm title="Delete this project?" confirmLabel="Delete"
-          message={`“${del.name}” and all its sections will be permanently deleted. Download a backup first if you might want it back.`}
+          message={`“${del.name}” and everything in it will be deleted for good. If you might want it back, save a backup first.`}
           onConfirm={() => deleteNovel(del.id)} onClose={() => setDel(null)} />
       )}
     </div>

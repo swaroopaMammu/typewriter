@@ -121,10 +121,10 @@ export async function importBackup(file: File): Promise<number> {
   try {
     data = JSON.parse((await file.text()).replace(/^﻿/, ""));
   } catch {
-    throw new Error("That file is not valid JSON.");
+    throw new Error("We couldn't read that file. Please choose a TypeWriter backup (.json).");
   }
   if (data?.app !== "typewriter" || !Array.isArray(data.novels)) {
-    throw new Error("That is not a TypeWriter backup file.");
+    throw new Error("That doesn't look like a TypeWriter backup file.");
   }
   const existing = new Set((await db.novels.toArray()).map((n) => n.name));
   let count = 0;
@@ -141,7 +141,7 @@ export async function importBackup(file: File): Promise<number> {
     await db.transaction("rw", db.novels, db.sections, async () => {
       await db.novels.add({
         id, name, category: String(bn.category || "Other"), type, createdAt: bn.createdAt || now, updatedAt: now,
-        ...(type === "screenplay" && Array.isArray(bn.characters) ? { characters: bn.characters } : {}),
+        ...(type !== "poem" && Array.isArray(bn.characters) ? { characters: bn.characters } : {}),
       });
       const rows: Section[] = (secs.length ? secs : [{ title: "", order: 0, content: "" }]).map((s, i) => {
         const content = String(s.content ?? "");

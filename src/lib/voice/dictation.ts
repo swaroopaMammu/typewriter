@@ -30,17 +30,17 @@ export interface DictationHandlers {
 }
 
 const ERRORS: Record<string, string> = {
-  "not-allowed": "Microphone permission was denied. Allow it in the browser's address bar and try again.",
-  "service-not-allowed": "Speech recognition is blocked in this browser.",
-  "audio-capture": "No microphone was found.",
-  network: "Voice typing needs an internet connection.",
-  "language-not-supported": "This browser can't recognise that language.",
+  "not-allowed": "We can't use your microphone yet. Click the lock icon next to the web address, allow the microphone, then try again.",
+  "service-not-allowed": "Voice typing is turned off in this browser.",
+  "audio-capture": "We couldn't find a microphone. Please plug one in and try again.",
+  network: "Voice typing needs an internet connection. Please check yours and try again.",
+  "language-not-supported": "This browser can't understand that language by voice.",
 };
 
 /** Start listening; returns a function that stops it. Restarts by itself when the browser ends a session on silence. */
 export function startDictation(lang: string, h: DictationHandlers): () => void {
   const SR = ctor();
-  if (!SR) { h.onStop("Voice typing isn't supported in this browser."); return () => {}; }
+  if (!SR) { h.onStop("Voice typing isn't available in this browser. Try Chrome, Edge or Safari."); return () => {}; }
   let wanted = true;
   let rec: Recognizer | null = null;
   let restarts = 0;
@@ -69,14 +69,14 @@ export function startDictation(lang: string, h: DictationHandlers): () => void {
       if (!wanted) return;
       // browsers end a session after a pause; keep going, but give up if it keeps dying instantly
       restarts = Date.now() - lastStart > 3000 ? 0 : restarts + 1;
-      if (restarts > 4) { wanted = false; h.onStop("Voice typing keeps stopping. Please try again."); return; }
+      if (restarts > 4) { wanted = false; h.onStop("Voice typing keeps stopping. Please try again in a moment."); return; }
       setTimeout(() => { if (wanted) { try { begin(); } catch { wanted = false; h.onStop(); } } }, 150);
     };
     lastStart = Date.now();
     rec.start();
   };
 
-  try { begin(); } catch { wanted = false; h.onStop("Could not start the microphone."); }
+  try { begin(); } catch { wanted = false; h.onStop("We couldn't start the microphone. Please try again."); }
   return () => {
     if (!wanted && !rec) return;
     const was = wanted;

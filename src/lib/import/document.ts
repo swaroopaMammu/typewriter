@@ -137,7 +137,7 @@ export async function extractPdfText(file: File): Promise<string> {
     lines.push({ y: Number.NaN, text: "" }); // page break: neutral, does not force a paragraph break
   }
   if (!lines.some((l) => l.text.trim())) {
-    throw new Error("No selectable text found in this PDF (it may be a scanned image).");
+    throw new Error("We couldn't find any text in this PDF. It may be a scanned picture of pages.");
   }
 
   // paragraph breaks = unusually large vertical gap between consecutive lines
@@ -169,7 +169,7 @@ export const titleFromFile = (name: string) => name.replace(/\.[^.]+$/, "").repl
 /** Reads a .txt / .md / .pdf and creates a NEW project from it (never overwrites). Returns its id. */
 export async function importDocument(file: File, o: ImportOptions): Promise<string> {
   const raw = await readDocument(file);
-  if (!raw.trim()) throw new Error("That file has no text.");
+  if (!raw.trim()) throw new Error("That file looks empty.");
   const pieces = buildSections(raw, o);
   const now = Date.now();
   const id = crypto.randomUUID();

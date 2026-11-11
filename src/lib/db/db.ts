@@ -63,7 +63,7 @@ export const unitName = (t: NovelType) => (t === "screenplay" ? "Scene" : t === 
 export const typeLabel = (t: NovelType) => (t === "screenplay" ? "Screenplay" : t === "poem" ? "Poetry" : "Novel");
 export const NOVEL_TYPES: NovelType[] = ["novel", "poem", "screenplay"];
 export const typeHint = (t: NovelType) =>
-  t === "screenplay" ? "Scene 1, 2, 3… with INT./EXT. headings" : t === "poem" ? "A collection of poems, line by line in stanzas" : "Chapters of prose";
+  t === "screenplay" ? "Scenes with places, times, action and dialogue" : t === "poem" ? "A collection of poems, with your line breaks kept" : "A story told in chapters";
 
 /** Display label of a section: screenplay scenes are always numbered by position. */
 export const sectionLabel = (t: NovelType, s: Section, index: number) =>
