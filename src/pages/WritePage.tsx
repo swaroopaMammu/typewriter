@@ -12,6 +12,7 @@ import ScriptEditor from "../components/ScriptEditor";
 import CharactersModal, { DeleteButton } from "../components/CharactersModal";
 import { Confirm, Menu, ThemeToggle } from "../components/ui";
 import VoiceButton from "../components/VoiceButton";
+import SoundToggle, { toggleSound, useSoundOn } from "../components/SoundToggle";
 import Tipped from "../components/Tip";
 import { IS_ARTIFACT, IS_NATIVE, IS_TOUCH } from "../env";
 import { focusFirstField, stepFocus } from "../lib/nav";
@@ -59,6 +60,7 @@ function PeopleIcon() {
 }
 
 function GuidePanel({ onClose }: { onClose: () => void }) {
+  const soundIsOn = useSoundOn();
   return (
     <aside className="guide glass" aria-label="Typing guide">
       <div className="side-head">
@@ -80,6 +82,10 @@ function GuidePanel({ onClose }: { onClose: () => void }) {
         Screenplays: each scene has a short setup, the characters in it (and what they wear), then the action and dialogue in order.
         Click a character to give them a line, or press <kbd>Ctrl</kbd>+<kbd>Enter</kbd> inside a line to jump to the next speaker.
       </p>
+      <label className="guide-check">
+        <input type="checkbox" checked={soundIsOn} onChange={(e) => toggleSound(e.target.checked)} />
+        Soft typing sound
+      </label>
       <h3 className="guide-h">Keyboard shortcuts</h3>
       <table className="keys">
         <tbody>
@@ -246,6 +252,7 @@ export default function WritePage() {
           </button>
         </Tipped>
         <VoiceButton mode={mode} />
+        <SoundToggle />
         {!IS_ARTIFACT && (
           <button className="btn hide-sm" onClick={toggleOnline} title="Turn this on to get extra word suggestions from Google. While it is on, the words you type are sent to Google.">
             More suggestions: {online ? "On" : "Off"}

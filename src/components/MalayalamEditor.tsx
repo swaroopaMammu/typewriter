@@ -6,6 +6,7 @@ import { loadLearned, saveLearned } from "../lib/translit/learned";
 import { caretCoords } from "./caret";
 import { IS_TOUCH } from "../env";
 import { TIP_MS } from "../lib/tips";
+import { keyClick } from "../lib/sound";
 
 type El = HTMLTextAreaElement | HTMLInputElement;
 
@@ -164,7 +165,12 @@ export default function MalayalamEditor({ initial, mode, online, onChange, singl
   const beforeInput = useRef<(e: InputEvent) => void>(() => {});
   beforeInput.current = (e) => {
     const el = ref.current;
-    if (!el || mode !== "ml" || programmatic || e.isComposing) return;
+    if (!el || programmatic || e.isComposing) return;
+    // a click for each key typed on a phone keyboard (physical keyboards click from keydown; clicks too close together are merged)
+    if (e.inputType === "insertText" && e.data && e.data.length === 1) keyClick(e.data === " " ? "space" : "key");
+    else if (e.inputType === "insertLineBreak") keyClick("enter");
+    else if (e.inputType === "deleteContentBackward") keyClick("back");
+    if (mode !== "ml") return;
     if (e.inputType === "insertText" && e.data && e.data.length === 1 && isWordChar(e.data)) {
       e.preventDefault(); // one typed key: run it through the Manglish engine instead
       typeLetter(el, e.data);
@@ -200,6 +206,11 @@ export default function MalayalamEditor({ initial, mode, online, onChange, singl
     const el = e.currentTarget;
     if (e.nativeEvent.isComposing) return;
     if (e.key === "Unidentified" || e.nativeEvent.keyCode === 229) return; // soft keyboard: handled in beforeinput
+    if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (e.key.length === 1) keyClick(e.key === " " ? "space" : "key"); // every character you type
+      else if (e.key === "Enter") keyClick("enter");
+      else if (e.key === "Backspace" || e.key === "Delete") keyClick("back");
+    }
     const s = st.current;
     const mods = e.ctrlKey || e.metaKey || e.altKey;
 

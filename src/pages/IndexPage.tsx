@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { createNovel, db, deleteNovel, novelType, NOVEL_TYPES, typeHint, typeLabel, unitName, updateNovel, type Novel, type NovelType } from "../lib/db/db";
 import Tipped from "../components/Tip";
+import SoundToggle from "../components/SoundToggle";
 import { importDocument, titleFromFile, type ImportMode } from "../lib/import/document";
 import { downloadAllBackup, downloadNovelBackup, downloadNovelText, importBackup } from "../lib/export/exporters";
 import { CATEGORIES, Confirm, Menu, Modal, ThemeToggle } from "../components/ui";
@@ -178,6 +179,7 @@ export default function IndexPage() {
           <button className="btn" onClick={() => fileRef.current?.click()}>Import</button>
         </Tipped>
         <button className="btn hide-sm" onClick={() => downloadAllBackup()} disabled={!novels?.length}>Backup all</button>
+        <SoundToggle />
         <ThemeToggle />
         <Tipped id="new" order={2} text="Start a novel, a poetry collection or a screenplay">
           <button className="btn primary" onClick={() => setForm("new")}>+ New</button>
